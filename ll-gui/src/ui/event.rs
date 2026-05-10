@@ -6,5 +6,4 @@ pub enum UiEvent {
     SwitchStack(&'static str),
     SetProfile(ll_core::Profile),
     UpdateAvailable,
-    UpdateFormats,
 }

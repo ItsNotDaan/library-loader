@@ -1,3 +1,529 @@
+/* ══════════════════════════════════════════════════════════════
+   Library Loader — Dark theme (Catppuccin Mocha)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Foundation ─────────────────────────────────────────────── */
+
+window, .background {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+
+* {
+    color: #cdd6f4;
+}
+
+/* ── Header bar ─────────────────────────────────────────────── */
+
+headerbar, .titlebar {
+    background-color: #2a2a3c;
+    background-image: none;
+    border-bottom: 1px solid #444460;
+    color: #cdd6f4;
+    box-shadow: none;
+}
+
+headerbar .title {
+    color: #cdd6f4;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+headerbar .subtitle {
+    color: #7f849c;
+    font-size: 10px;
+}
+
+headerbar button {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #cdd6f4;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+headerbar button:hover {
+    background: rgba(137,180,250,0.1);
+}
+
+/* ── Buttons (base) ─────────────────────────────────────────── */
+
+button {
+    background-color: #333347;
+    background-image: none;
+    color: #cdd6f4;
+    border: 1.5px solid #444460;
+    border-radius: 8px;
+    padding: 7px 14px;
+    box-shadow: none;
+    outline: none;
+    font-size: 14px;
+    transition: background-color 120ms;
+}
+
+button:hover {
+    background-color: #3d3d55;
+    background-image: none;
+    box-shadow: none;
+}
+
+button:active, button:checked {
+    background-color: #444460;
+    background-image: none;
+    box-shadow: none;
+}
+
+button:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Primary / accent */
+button.primary-btn {
+    background-color: #89b4fa;
+    background-image: none;
+    color: #1e1e2e;
+    border: none;
+    font-weight: 600;
+}
+
+button.primary-btn:hover {
+    background-color: #9dc3fb;
+    background-image: none;
+}
+
+button.primary-btn label {
+    color: #1e1e2e;
+}
+
+/* Suggested action (login button) */
+button.suggested-action {
+    background-color: #89b4fa;
+    background-image: none;
+    color: #1e1e2e;
+    border: none;
+    font-weight: 600;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+button.suggested-action:hover {
+    background-color: #9dc3fb;
+    background-image: none;
+}
+
+/* Destructive action */
+button.destructive-action {
+    background-color: #f38ba8;
+    background-image: none;
+    color: #1e1e2e;
+    border: none;
+}
+
+/* Small button (Browse, etc.) */
+button.small-btn {
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+/* Add-path "+" button */
+button.add-path-btn {
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+    color: #89b4fa;
+    font-size: 18px;
+    padding: 0 6px;
+    min-width: 0;
+    border-radius: 6px;
+}
+
+button.add-path-btn:hover {
+    background-color: rgba(137,180,250,0.1);
+    background-image: none;
+}
+
+/* Delete button in rows */
+button.delete-btn {
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 20px;
+    padding: 3px;
+    opacity: 0.45;
+    min-width: 0;
+    min-height: 0;
+}
+
+button.delete-btn:hover {
+    opacity: 1;
+    background-color: rgba(243,139,168,0.15);
+    background-image: none;
+}
+
+/* ── ECAD Tool Chips ─────────────────────────────────────────── */
+
+button.chip, togglebutton.chip {
+    background-color: #1e1e2e;
+    background-image: none;
+    color: #7f849c;
+    border: 1px solid #444460;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: 400;
+    box-shadow: none;
+}
+
+button.chip:hover, togglebutton.chip:hover {
+    background-color: #2a2a3c;
+    background-image: none;
+    color: #cdd6f4;
+}
+
+togglebutton.chip:checked {
+    background-color: #89b4fa;
+    background-image: none;
+    color: #1e1e2e;
+    border-color: #89b4fa;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+/* ── Entries ────────────────────────────────────────────────── */
+
+entry {
+    background-color: #1e1e2e;
+    background-image: none;
+    color: #cdd6f4;
+    border: 1.5px solid #444460;
+    border-radius: 8px;
+    padding: 6px 10px;
+    box-shadow: none;
+    caret-color: #89b4fa;
+    font-size: 13px;
+}
+
+entry:focus {
+    border-color: #89b4fa;
+    background-color: #1e1e2e;
+    background-image: none;
+    box-shadow: none;
+}
+
+entry selection {
+    background-color: #45475a;
+}
+
+/* ── Switch ─────────────────────────────────────────────────── */
+
+switch {
+    background-color: #45475a;
+    background-image: none;
+    border-radius: 12px;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    min-width: 36px;
+    min-height: 20px;
+}
+
+switch:checked {
+    background-color: #89b4fa;
+    background-image: none;
+}
+
+switch slider {
+    background-color: #fff;
+    background-image: none;
+    border-radius: 50%;
+    border: none;
+    box-shadow: none;
+    min-width: 16px;
+    min-height: 16px;
+    margin: 2px;
+}
+
+/* ── CheckButton ────────────────────────────────────────────── */
+
+checkbutton {
+    color: #cdd6f4;
+    font-size: 13px;
+    padding: 2px 0;
+}
+
+checkbutton check {
+    background-color: #1e1e2e;
+    background-image: none;
+    border: 1.5px solid #444460;
+    border-radius: 4px;
+    min-width: 14px;
+    min-height: 14px;
+}
+
+checkbutton:checked check {
+    background-color: #89b4fa;
+    background-image: none;
+    border-color: #89b4fa;
+    color: #1e1e2e;
+}
+
+/* ── Frame / Card ───────────────────────────────────────────── */
+
+frame.card {
+    border: 1.5px solid #444460;
+    border-radius: 10px;
+    background-color: #2a2a3c;
+    background-image: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+frame.card > border {
+    border: none;
+    border-radius: 10px;
+}
+
+/* ── ListBox ─────────────────────────────────────────────────── */
+
+listbox {
+    background-color: #2a2a3c;
+    background-image: none;
+    border: 1.5px solid #444460;
+    border-radius: 8px;
+}
+
+listbox > row {
+    background-color: transparent;
+    background-image: none;
+    padding: 0;
+    border-bottom: 1px solid #444460;
+}
+
+listbox > row:last-child {
+    border-bottom: none;
+}
+
+listbox > row:hover {
+    background-color: rgba(255,255,255,0.03);
+    background-image: none;
+}
+
+listbox > row:selected {
+    background-color: #333347;
+    background-image: none;
+}
+
+/* ── TextView / Activity Log ────────────────────────────────── */
+
+textview {
+    background-color: #1e1e2e;
+    background-image: none;
+    color: #7f849c;
+    font-family: "IBM Plex Mono", "SF Mono", "Menlo", monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 6px;
+}
+
+textview text {
+    background-color: #1e1e2e;
+    color: #7f849c;
+}
+
+/* ── Scrolled Window ─────────────────────────────────────────── */
+
+scrolledwindow {
+    background-color: transparent;
+}
+
+scrollbar {
+    background-color: transparent;
+}
+
+scrollbar trough {
+    background-color: #2a2a3c;
+    border-radius: 4px;
+    min-width: 4px;
+}
+
+scrollbar slider {
+    background-color: #444460;
+    border-radius: 4px;
+    min-width: 4px;
+}
+
+scrollbar slider:hover {
+    background-color: #7f849c;
+}
+
+/* ── Separators ─────────────────────────────────────────────── */
+
+separator {
+    background-color: #444460;
+    min-height: 1px;
+    min-width: 1px;
+}
+
+/* ── InfoBar ─────────────────────────────────────────────────── */
+
+infobar {
+    background-color: #333347;
+    background-image: none;
+    border-bottom: 1px solid #444460;
+}
+
+infobar.info    { background-color: rgba(137,180,250,0.12); }
+infobar.warning { background-color: rgba(250,179,135,0.12); }
+infobar.error   { background-color: rgba(243,139,168,0.12); }
+
+/* ── Popover / Menu ─────────────────────────────────────────── */
+
+popover {
+    background-color: #2a2a3c;
+    border: 1.5px solid #444460;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+popover > contents {
+    background-color: #2a2a3c;
+    padding: 4px;
+}
+
+modelbutton {
+    background-color: transparent;
+    background-image: none;
+    color: #cdd6f4;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+    font-size: 14px;
+}
+
+modelbutton:hover {
+    background-color: #333347;
+    background-image: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Custom classes
+   ══════════════════════════════════════════════════════════════ */
+
+/* Section headings (WATCHER, ECAD TOOL, etc.) */
+.section-heading {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #7f849c;
+}
+
+/* Watcher "● Active" indicator */
+.active-label {
+    font-size: 12px;
+    color: #a6e3a1;
+    font-weight: 500;
+}
+
+/* Activity Log "● Watching" label */
+.watching-label {
+    font-size: 11px;
+    color: #a6e3a1;
+}
+
+/* Format row name label */
 .format-title {
-    font-size: 16pt;
+    font-size: 13px;
+    font-weight: 500;
+    color: #cdd6f4;
+}
+
+/* Format row path label */
+.format-meta {
+    font-size: 11px;
+    color: #7f849c;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+/* Status bar */
+.status-bar {
+    background-color: #2a2a3c;
+    background-image: none;
+    border-top: 1px solid #444460;
+}
+
+.user-avatar {
+    background-color: #45475a;
+    color: #89b4fa;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 22px;
+    min-height: 22px;
+}
+
+.user-name-label {
+    font-size: 11px;
+    color: #7f849c;
+}
+
+.status-count-label {
+    font-size: 11px;
+    color: #a6e3a1;
+}
+
+/* dim-label (keep for compat) */
+.dim-label {
+    color: #7f849c;
+}
+
+/* Website link */
+.website-link {
+    color: #89b4fa;
+    font-size: 11px;
+    padding-bottom: 4px;
+}
+
+/* Login page heading */
+.login-heading {
+    font-size: 22px;
+    font-weight: 600;
+    color: #cdd6f4;
+    margin-bottom: 4px;
+}
+
+/* Static active-chip label (KiCad indicator) */
+.chip-active {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Folder icon button in path rows */
+button.folder-btn {
+    background-color: transparent;
+    background-image: none;
+    border: 1px solid #444460;
+    border-radius: 7px;
+    box-shadow: none;
+    padding: 5px 7px;
+    min-width: 0;
+    min-height: 0;
+    color: #7f849c;
+}
+
+button.folder-btn:hover {
+    background-color: rgba(137,180,250,0.12);
+    background-image: none;
+    border-color: #89b4fa;
+    color: #89b4fa;
 }

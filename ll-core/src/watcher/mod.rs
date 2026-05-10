@@ -18,6 +18,53 @@ use {
 
 mod event;
 
+/// Turn a core error into a human-readable string suitable for display in the log.
+fn describe_error(e: &crate::error::Error) -> String {
+    use crate::error::Error;
+    match e {
+        Error::ServerError(401) => {
+            "Authentication failed (HTTP 401): ComponentSearchEngine rejected your credentials. \
+             Please sign out and sign back in with your CSE username and password."
+                .to_string()
+        }
+        Error::ServerError(403) => {
+            "Access denied (HTTP 403): your CSE account may not have permission to \
+             download components via the API."
+                .to_string()
+        }
+        Error::ServerError(n) => format!("Server error: HTTP {}", n),
+        Error::NoEpwInZipArchive => {
+            "Not a CSE component file: no EPW metadata found inside the ZIP. \
+             Only ZIP files downloaded from ComponentSearchEngine are supported."
+                .to_string()
+        }
+        Error::ZipArchiveEmpty => "ZIP file is empty or corrupted.".to_string(),
+        Error::WouldOverwrite => {
+            "File already exists at the output path — skipping to avoid overwriting.".to_string()
+        }
+        Error::NoFilesInLibrary => {
+            "No matching files found in the downloaded package for the configured format."
+                .to_string()
+        }
+        Error::Other(msg) => msg.to_string(),
+        _ => format!("{}", e),
+    }
+}
+
+/// Process a single component ZIP file exactly as the watcher would do automatically.
+/// Reads the EPW metadata from the zip, fetches the component from CSE, and
+/// writes the output files to the configured paths.
+pub fn import_file(path: PathBuf, config: &Config) -> Result<()> {
+    let token = config.profile.token();
+    let formats = Arc::new(config.formats()?);
+    let epw = Epw::from_file(path)?;
+    for res in CSE::new(token, formats).get(epw)? {
+        res.save()?;
+    }
+    Ok(())
+}
+
+
 pub struct Watcher {
     token: String,
     watch_path: PathBuf,
@@ -87,7 +134,7 @@ impl Watcher {
                                                 )
                                             }
                                             Err(e) => {
-                                                log_error!(&*loggers_clone, e)
+                                                log_error!(&*loggers_clone, describe_error(&e))
                                             }
                                         }
                                     }
@@ -97,7 +144,7 @@ impl Watcher {
                                         log_info!(&*loggers, "Done");
                                     }
                                     Err(e) => {
-                                        log_error!(&*loggers, format!("{:?}", e));
+                                        log_error!(&*loggers, describe_error(&e));
                                     }
                                 }
                             }

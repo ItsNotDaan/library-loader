@@ -8,11 +8,18 @@ pub fn extract(
     archive: &mut zip::ZipArchive<Cursor<&Vec<u8>>>,
 ) -> Result<HashMap<String, Vec<u8>>> {
     let fp_folder_str = format!("{}.pretty", format.name);
+    let shapes_folder_str = format!("{}.3dshapes", format.name);
 
     //ensure we have the footprint library folder
     let footprint_folder = PathBuf::from(&format.output_path).join(fp_folder_str.clone());
     if !footprint_folder.exists() {
         fs::create_dir_all(footprint_folder.clone())?;
+    }
+
+    //ensure we have the 3D shapes folder
+    let shapes_folder = PathBuf::from(&format.output_path).join(shapes_folder_str.clone());
+    if !shapes_folder.exists() {
+        fs::create_dir_all(shapes_folder.clone())?;
     }
 
     //ensure the symbol library exists
@@ -35,11 +42,18 @@ pub fn extract(
         let base_name = path.file_name().unwrap().to_string_lossy().to_string();
         if let Some(ext) = &path.extension() {
             match ext.to_str() {
-                //footprint and 3d files are copied first
-                Some("kicad_mod") | Some("stl") | Some("stp") | Some("wrl") => {
+                // Footprint → .pretty/
+                Some("kicad_mod") => {
                     let mut f_data = Vec::<u8>::new();
                     item.read_to_end(&mut f_data)?;
                     let mut f = File::create(footprint_folder.join(base_name))?;
+                    f.write_all(&f_data)?;
+                }
+                // 3D model → .3dshapes/ (flat, no subfolder)
+                Some("stl") | Some("stp") | Some("wrl") | Some("step") => {
+                    let mut f_data = Vec::<u8>::new();
+                    item.read_to_end(&mut f_data)?;
+                    let mut f = File::create(shapes_folder.join(base_name))?;
                     f.write_all(&f_data)?;
                 }
                 Some("kicad_sym") => {

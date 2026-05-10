@@ -17,5 +17,5 @@ pub use {
     logger::{ConsoleLogger, Logger},
     updates::check as check_updates,
     updates::{ClientKind, UpdateInfo},
-    watcher::Watcher,
+    watcher::{import_file, Watcher},
 };

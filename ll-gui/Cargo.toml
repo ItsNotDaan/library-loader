@@ -11,6 +11,7 @@ build = "build/build.rs"
 gtk = { version = "0.18", features = [ "v3_24_9" ] }
 ll_core = { path = "../ll-core", package = "library-loader-core" }
 shellexpand = "3"
+tray-icon = "0.24"
 
 [build-dependencies]
 regex = "1"
