@@ -1,3 +1,5 @@
+**NOTE: Yes, I used Claude for this fork. I dont know how to program in Rust but I know how the structures and program works. Work with the tools you have. Props to the original author!**
+
 # Library Loader
 
 A Rust desktop app that watches your Downloads folder for EDA component ZIP files from [ComponentSearchEngine (CSE)](https://componentsearchengine.com) and automatically imports them into your KiCad libraries.
