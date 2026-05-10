@@ -30,6 +30,7 @@ mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 
 cp "$BINARY" "$APP/Contents/MacOS/library-loader-gui"
+chmod +x "$APP/Contents/MacOS/library-loader-gui"
 
 # Convert icon if rsvg-convert is available
 if which rsvg-convert > /dev/null 2>&1; then
@@ -43,19 +44,6 @@ if which rsvg-convert > /dev/null 2>&1; then
     rm -rf /tmp/LibraryLoader.iconset
 fi
 
-cat > "$APP/Contents/MacOS/LibraryLoader" << 'EOF'
-#!/bin/bash
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
-export DYLD_FALLBACK_LIBRARY_PATH="/opt/homebrew/lib"
-export XDG_DATA_DIRS="/opt/homebrew/share"
-export GTK_DATA_PREFIX="/opt/homebrew"
-export GTK_EXE_PREFIX="/opt/homebrew"
-export GTK_PATH="/opt/homebrew"
-export GDK_PIXBUF_MODULE_FILE="/opt/homebrew/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
-DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/library-loader-gui"
-EOF
-
 cat > "$APP/Contents/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -65,7 +53,7 @@ cat > "$APP/Contents/Info.plist" << 'EOF'
     <key>CFBundleDisplayName</key><string>Library Loader</string>
     <key>CFBundleIdentifier</key><string>dev.itsnot.library-loader</string>
     <key>CFBundleVersion</key><string>0.5.0</string>
-    <key>CFBundleExecutable</key><string>LibraryLoader</string>
+    <key>CFBundleExecutable</key><string>library-loader-gui</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>NSHighResolutionCapable</key><true/>
@@ -73,8 +61,6 @@ cat > "$APP/Contents/Info.plist" << 'EOF'
 </dict>
 </plist>
 EOF
-
-chmod +x "$APP/Contents/MacOS/LibraryLoader" "$APP/Contents/MacOS/library-loader-gui"
 
 echo ""
 echo "Done! Library Loader is installed in /Applications."

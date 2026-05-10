@@ -16,6 +16,22 @@ mod macros;
 mod ui;
 
 fn main() -> Result<()> {
+    // When launched as a .app bundle from Finder, Homebrew paths are not in the
+    // environment. Set them here so GTK and GDK can find resources at runtime.
+    #[cfg(target_os = "macos")]
+    {
+        use std::env;
+        if env::var("GTK_PATH").is_err() {
+            let path = env::var("PATH").unwrap_or_default();
+            env::set_var("PATH", format!("/opt/homebrew/bin:/opt/homebrew/sbin:{path}"));
+            env::set_var("XDG_DATA_DIRS", "/opt/homebrew/share");
+            env::set_var("GTK_DATA_PREFIX", "/opt/homebrew");
+            env::set_var("GTK_EXE_PREFIX", "/opt/homebrew");
+            env::set_var("GTK_PATH", "/opt/homebrew");
+            env::set_var("GDK_PIXBUF_MODULE_FILE", "/opt/homebrew/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache");
+        }
+    }
+
     let config_path = match Config::get_path()? {
         Some(p) => p,
         None => {
