@@ -24,25 +24,67 @@ The original project is a solid foundation but the UI was showing its age and ma
 
 ## Getting started
 
-### 1. Build from source (macOS)
+### The easy way — one script
 
-Required: `brew`, `rustc`, `cargo` (install Rust via [rustup](https://rustup.rs)).
+Make sure you have [Homebrew](https://brew.sh) and [Rust](https://rustup.rs) installed. Then open a terminal in the `library-loader` folder (in Finder: right-click the folder → **New Terminal at Folder**) and run:
+
+```shell
+./setup.sh
+```
+
+This will:
+1. Install any missing Homebrew dependencies (GTK3 etc.)
+2. Build the release binary for your Mac (Apple Silicon or Intel)
+3. Install **Library Loader** to `/Applications` with an icon, ready for Spotlight and Launchpad
+
+If macOS shows an "unidentified developer" warning on first launch, right-click the app → **Open** → **Open** to bypass it once.
+
+---
+
+### Manual steps (if you prefer)
+
+<details>
+<summary>Expand manual instructions</summary>
+
+**1. Install dependencies and build**
 
 ```shell
 ./macos-compile.sh
 ```
 
-Or manually:
+**2. Create the app bundle**
 
 ```shell
-cargo build --release
+APP="/Applications/LibraryLoader.app"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+# Apple Silicon:
+cp target/aarch64-apple-darwin/release/library-loader-gui "$APP/Contents/MacOS/library-loader-gui"
+# Intel: replace with target/x86_64-apple-darwin/release/library-loader-gui
 ```
 
-The GUI binary is at `target/release/library-loader-gui`.
+**3. Create the launcher** — save this as `$APP/Contents/MacOS/LibraryLoader` and `chmod +x` it:
 
-### 2. First launch
+```shell
+#!/bin/bash
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+export DYLD_FALLBACK_LIBRARY_PATH="/opt/homebrew/lib"
+export XDG_DATA_DIRS="/opt/homebrew/share"
+export GTK_DATA_PREFIX="/opt/homebrew"
+export GTK_EXE_PREFIX="/opt/homebrew"
+export GTK_PATH="/opt/homebrew"
+export GDK_PIXBUF_MODULE_FILE="/opt/homebrew/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/library-loader-gui"
+```
 
-Run the app and sign in with your [componentsearchengine.com](https://componentsearchengine.com) credentials using the menu in the top-right corner. Your config is stored at:
+</details>
+
+---
+
+### First launch
+
+Sign in with your [componentsearchengine.com](https://componentsearchengine.com) credentials using the menu in the top-right corner. Your config is stored at:
 
 ```
 ~/Library/Application Support/LibraryLoader.toml
