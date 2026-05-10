@@ -79,27 +79,79 @@ fn set_kicad_path(config: &mut Config, path: String) {
 
 // ── Transfer helpers ──────────────────────────────────────────────────────────
 
-/// List footprint names (.kicad_mod stems) from `{output_path}/{lib_name}.pretty/`.
+/// List component names from `{output_path}/{lib_name}.kicad_sym`.
+/// Returns the top-level symbol names (e.g. "AD5940BCBZ-RL"), which are the
+/// recognisable component names — not the footprint file stems which are
+/// package codes like "BGA56C40P8X7_416X356X55".
+///
+/// Falls back to listing `.kicad_mod` stems from `.pretty/` if the sym file
+/// is missing or empty.
 fn list_kicad_components(output_path: &str, lib_name: &str) -> Vec<String> {
-    let pretty = PathBuf::from(output_path).join(format!("{}.pretty", lib_name));
-    if !pretty.is_dir() {
-        return vec![];
+    let sym_path = PathBuf::from(output_path).join(format!("{}.kicad_sym", lib_name));
+    if let Ok(content) = std::fs::read_to_string(&sym_path) {
+        let mut names: Vec<String> = content
+            .lines()
+            .filter_map(|line| {
+                let trimmed = line.trim();
+                let name = trimmed.strip_prefix("(symbol \"")?;
+                let end = name.find('"')?;
+                let sym_name = &name[..end];
+                // Skip sub-unit entries — they end with _<digits>_<digits>
+                if is_sub_symbol(sym_name) { None } else { Some(sym_name.to_string()) }
+            })
+            .collect();
+        names.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        if !names.is_empty() {
+            return names;
+        }
     }
+    // Fallback: .kicad_mod stems
+    let pretty = PathBuf::from(output_path).join(format!("{}.pretty", lib_name));
     let mut names: Vec<String> = std::fs::read_dir(&pretty)
-        .into_iter()
-        .flatten()
-        .flatten()
+        .into_iter().flatten().flatten()
         .filter_map(|e| {
             let p = e.path();
             if p.extension()?.to_str()? == "kicad_mod" {
                 p.file_stem()?.to_str().map(|s| s.to_string())
-            } else {
-                None
-            }
+            } else { None }
         })
         .collect();
     names.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
     names
+}
+
+/// Returns true if `name` looks like a KiCad sub-unit symbol (ends with _N_N).
+fn is_sub_symbol(name: &str) -> bool {
+    let parts: Vec<&str> = name.rsplitn(3, '_').collect();
+    parts.len() >= 3
+        && parts[0].chars().all(|c| c.is_ascii_digit())
+        && parts[1].chars().all(|c| c.is_ascii_digit())
+        && !parts[1].is_empty()
+        && !parts[0].is_empty()
+}
+
+/// Given a symbol name, return the footprint stem (the part after `:` in the
+/// Footprint property), e.g. "AD5940BCBZ-RL" → "BGA56C40P8X7_416X356X55".
+/// Falls back to the symbol name itself if no Footprint property is found.
+fn footprint_stem_for_symbol(sym_content: &str, symbol_name: &str) -> String {
+    let marker = format!("(symbol \"{}\"", symbol_name);
+    if let Some(sym_pos) = sym_content.find(&marker) {
+        let end = (sym_pos + 4096).min(sym_content.len());
+        let area = &sym_content[sym_pos..end];
+        if let Some(fp_pos) = area.find("\"Footprint\"") {
+            let after = &area[fp_pos + 11..];
+            if let Some(qs) = after.find('"') {
+                let inner = &after[qs + 1..];
+                if let Some(qe) = inner.find('"') {
+                    let val = &inner[..qe]; // e.g. "LibLoader:BGA56C40P8X7_416X356X55"
+                    if let Some(stem) = val.rsplit(':').next().filter(|s| !s.is_empty()) {
+                        return stem.to_string();
+                    }
+                }
+            }
+        }
+    }
+    symbol_name.to_string() // fallback: symbol name == footprint name
 }
 
 /// Populate the transfer ListBox with component names.
@@ -138,17 +190,145 @@ fn copy_footprint_files(
     Ok(count)
 }
 
+/// Rewrite `(model ...)` paths in a `.kicad_mod` so they point to `dest_lib`'s
+/// 3D-shapes folder.  Handles quoted, unquoted, bare, and variable paths.
+fn rewrite_mod_paths(content: &str, source_lib: &str, dest_lib: &str) -> String {
+    let src_prefix = format!("${{KICAD_LOCAL_LIB_DIR}}/{}/", source_lib);
+    let dst_prefix = format!("${{KICAD_LOCAL_LIB_DIR}}/{}/", dest_lib);
+    let mut out = String::with_capacity(content.len());
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if let Some(after_model) = trimmed.strip_prefix("(model ") {
+            let indent = &line[..line.len() - trimmed.len()];
+
+            // Quoted path: (model "foo.stp"
+            if let Some(inner) = after_model.strip_prefix('"') {
+                if let Some(quote_end) = inner.find('"') {
+                    let path = &inner[..quote_end];
+                    let rest = &inner[quote_end..]; // starts with closing "
+                    let new_path = map_path(path, &src_prefix, &dst_prefix, dest_lib);
+                    out.push_str(&format!("{}(model \"{}{}", indent, new_path, rest));
+                    out.push('\n');
+                    continue;
+                }
+            } else {
+                // Unquoted path: (model foo.stp — token ends at whitespace or end-of-line
+                let path_end = after_model
+                    .find(|c: char| c.is_whitespace())
+                    .unwrap_or(after_model.len());
+                let path = &after_model[..path_end];
+                let rest = &after_model[path_end..];
+                let new_path = map_path(path, &src_prefix, &dst_prefix, dest_lib);
+                // Always write with quotes so the result is well-formed
+                out.push_str(&format!("{}(model \"{}\"{}", indent, new_path, rest));
+                out.push('\n');
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+fn map_path(path: &str, src_prefix: &str, _dst_prefix: &str, dest_lib: &str) -> String {
+    if path.starts_with(src_prefix) {
+        // Strip the source prefix, then take only the filename (ignore the
+        // source "{source_lib}.3dshapes/" segment) and rebuild for dest_lib.
+        let after = &path[src_prefix.len()..];
+        let filename = after.rsplit('/').next().unwrap_or(after);
+        format!("${{KICAD_LOCAL_LIB_DIR}}/{}/{}.3dshapes/{}", dest_lib, dest_lib, filename)
+    } else if !path.is_empty() && !path.contains('/') && !path.contains('\\') && !path.starts_with('$') {
+        format!("${{KICAD_LOCAL_LIB_DIR}}/{}/{}.3dshapes/{}", dest_lib, dest_lib, path)
+    } else {
+        path.to_string()
+    }
+}
+
+/// Extract the bare 3D model filenames referenced in a `.kicad_mod` file.
+/// Works with both quoted `(model "path/to/foo.stp"` and unquoted `(model foo.stp`.
+/// Returns just the filename part (no directory).
+fn extract_model_filenames(content: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if let Some(after_model) = trimmed.strip_prefix("(model ") {
+            let raw_path = if let Some(inner) = after_model.strip_prefix('"') {
+                // Quoted: take up to the closing "
+                &inner[..inner.find('"').unwrap_or(inner.len())]
+            } else {
+                // Unquoted: take up to whitespace or end of token
+                let end = after_model
+                    .find(|c: char| c.is_whitespace())
+                    .unwrap_or(after_model.len());
+                &after_model[..end]
+            };
+            // Extract just the filename from whatever path style
+            let filename = raw_path
+                .replace('\\', "/")
+                .split('/')
+                .last()
+                .unwrap_or("")
+                .to_string();
+            if !filename.is_empty() {
+                names.push(filename);
+            }
+        }
+    }
+    names
+}
+
 /// Extract the `(symbol ...)` block from a .kicad_sym file that references
-/// `{lib_name}:{component}` in its Footprint property.
+/// `component` in its Footprint property.
+///
+/// First tries an exact `"{lib_name}:{component}"` match (fast path for
+/// libraries imported by LibLoader where the prefix is always correct).
+/// Falls back to matching any `":{component}"` suffix, which handles libraries
+/// whose Footprint properties carry a stale or different lib prefix
+/// (e.g. `"PCB_Lib_ItsNotDaan_KiCad:SOT95P280X145-5N"`).
 fn extract_symbol_block(lib_content: &str, lib_name: &str, component: &str) -> Option<String> {
-    let target = format!("\"{}:{}\"", lib_name, component);
-    let ref_pos = lib_content.find(&target)?;
+    let exact   = format!("\"{}:{}\"", lib_name, component);
+    let fallback = format!("\":{}\"", component);
+    let ref_pos = lib_content
+        .find(&exact)
+        .or_else(|| lib_content.find(&fallback))?;
     // Walk backwards to find the enclosing (symbol "..." block
     let before = &lib_content[..ref_pos];
     let sym_start = before.rfind("\n  (symbol \"")?;
     let sym_start = sym_start + 1; // skip the newline
     // Count parentheses to find the end
     let from = &lib_content[sym_start..];
+    let mut depth = 0i32;
+    let mut end = 0;
+    for (i, ch) in from.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = i + 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    if end > 0 { Some(from[..end].to_string()) } else { None }
+}
+
+/// Extract the `(symbol ...)` block for the given symbol name directly.
+fn extract_symbol_block_by_name(lib_content: &str, symbol_name: &str) -> Option<String> {
+    let marker = format!("(symbol \"{}\"", symbol_name);
+    // Find a line that starts (after whitespace) with our marker
+    let ref_pos = lib_content.find(&marker)?;
+    // Walk back to the start of the line
+    let line_start = lib_content[..ref_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    // Skip if indented more than one level (would be a sub-unit, not top-level)
+    let indent = &lib_content[line_start..ref_pos];
+    if indent.contains("  ") && indent.trim().is_empty() && indent.len() > 2 {
+        return None; // too deeply indented — skip sub-units
+    }
+    let from = &lib_content[line_start..];
     let mut depth = 0i32;
     let mut end = 0;
     for (i, ch) in from.char_indices() {
@@ -184,8 +364,9 @@ fn append_to_sym_lib(lib_path: &Path, block: &str) -> std::io::Result<()> {
 }
 
 /// Transfer one component (footprint + symbol + 3D) from source library to dest folder.
-/// Mirrors the KiCad library layout: everything lives under one parent dir with a shared
-/// lib name prefix: `{lib}.pretty/`, `{lib}.3dshapes/`, `{lib}.kicad_sym`.
+/// `component` is the **symbol name** (e.g. "AD5940BCBZ-RL") as shown in the UI list.
+/// The footprint stem (e.g. "BGA56C40P8X7_416X356X55") is resolved from the symbol's
+/// Footprint property and used for all file operations.
 fn do_transfer(
     component: &str,
     source_path: &str,
@@ -201,34 +382,51 @@ fn do_transfer(
         .unwrap_or("MyLib")
         .to_string();
 
+    // Resolve footprint stem from the symbol's Footprint property.
+    // e.g. symbol "AD5940BCBZ-RL" → footprint "BGA56C40P8X7_416X356X55"
+    let src_sym_path = src.join(format!("{}.kicad_sym", source_lib));
+    let sym_content = std::fs::read_to_string(&src_sym_path).unwrap_or_default();
+    let footprint = footprint_stem_for_symbol(&sym_content, component);
+
     // ── Footprint (.pretty/) ─────────────────────────────────────────────────
     let src_pretty = src.join(format!("{}.pretty", source_lib));
     let dst_pretty = dst.join(format!("{}.pretty", dest_lib));
-    let mut count = copy_footprint_files(&src_pretty, &dst_pretty, component)?;
+    let mut count = copy_footprint_files(&src_pretty, &dst_pretty, &footprint)?;
 
-    // ── Symbol (.kicad_sym) ──────────────────────────────────────────────────
-    let src_sym = src.join(format!("{}.kicad_sym", source_lib));
-    if src_sym.exists() {
-        if let Ok(content) = std::fs::read_to_string(&src_sym) {
-            if let Some(block) = extract_symbol_block(&content, source_lib, component) {
-                let dst_sym = dst.join(format!("{}.kicad_sym", dest_lib));
-                let _ = append_to_sym_lib(&dst_sym, &block);
-            }
+    // Rewrite 3D model paths in the copied .kicad_mod so they point to the
+    // destination library's .3dshapes folder.
+    let dst_mod = dst_pretty.join(format!("{}.kicad_mod", footprint));
+    if dst_mod.exists() {
+        if let Ok(content) = std::fs::read_to_string(&dst_mod) {
+            let fixed = rewrite_mod_paths(&content, source_lib, &dest_lib);
+            let _ = std::fs::write(&dst_mod, fixed);
         }
     }
 
+    // ── Symbol (.kicad_sym) ──────────────────────────────────────────────────
+    // Extract symbol by name directly — more reliable than searching by Footprint property.
+    if let Some(block) = extract_symbol_block_by_name(&sym_content, component) {
+        let dst_sym = dst.join(format!("{}.kicad_sym", dest_lib));
+        let _ = append_to_sym_lib(&dst_sym, &block);
+    }
+
     // ── 3D models (.3dshapes/) ───────────────────────────────────────────────
-    // 3D files live flat in {source_path}/{source_lib}.3dshapes/{component}.stp etc.
-    let src_shapes = src.join(format!("{}.3dshapes", source_lib));
-    if src_shapes.is_dir() {
+    // Read the model filenames from the source .kicad_mod directly — the stem
+    // of the 3D file often differs from the footprint name, so matching by
+    // stem is unreliable.
+    let src_mod = src_pretty.join(format!("{}.kicad_mod", footprint));
+    let model_filenames: Vec<String> = std::fs::read_to_string(&src_mod)
+        .map(|c| extract_model_filenames(&c))
+        .unwrap_or_default();
+
+    if !model_filenames.is_empty() {
+        let src_shapes = src.join(format!("{}.3dshapes", source_lib));
         let dst_shapes = dst.join(format!("{}.3dshapes", dest_lib));
         std::fs::create_dir_all(&dst_shapes)?;
-        for entry in std::fs::read_dir(&src_shapes)?.flatten() {
-            let from = entry.path();
-            if from.is_file()
-                && from.file_stem().and_then(|s| s.to_str()) == Some(component)
-            {
-                let to = dst_shapes.join(from.file_name().unwrap());
+        for filename in &model_filenames {
+            let from = src_shapes.join(filename);
+            if from.is_file() {
+                let to = dst_shapes.join(filename);
                 if !to.exists() {
                     std::fs::copy(&from, &to)?;
                     count += 1;

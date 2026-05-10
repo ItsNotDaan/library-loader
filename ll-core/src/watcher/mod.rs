@@ -59,7 +59,13 @@ pub fn import_file(path: PathBuf, config: &Config) -> Result<()> {
     let formats = Arc::new(config.formats()?);
     let epw = Epw::from_file(path)?;
     for res in CSE::new(token, formats).get(epw)? {
-        res.save()?;
+        match res.save() {
+            Ok(_) => {}
+            // KiCad extractor writes files directly to disk and returns an empty
+            // Files map, so save() always reports NoFilesInLibrary — that is fine.
+            Err(crate::error::Error::NoFilesInLibrary) => {}
+            Err(e) => return Err(e),
+        }
     }
     Ok(())
 }
@@ -133,6 +139,9 @@ impl Watcher {
                                                     format!("Saved to {:?}", save_path)
                                                 )
                                             }
+                                            // KiCad extractor writes directly → empty Files
+                                            // map → NoFilesInLibrary is expected, not an error.
+                                            Err(crate::error::Error::NoFilesInLibrary) => {}
                                             Err(e) => {
                                                 log_error!(&*loggers_clone, describe_error(&e))
                                             }
@@ -143,6 +152,11 @@ impl Watcher {
                                     Ok(()) => {
                                         log_info!(&*loggers, "Done");
                                     }
+                                    // Browser temp files (e.g. random-name .zip) are created
+                                    // and immediately renamed before we can read them.
+                                    // Silently ignore — the real download fires its own event.
+                                    Err(crate::error::Error::Io(ref e))
+                                        if e.kind() == std::io::ErrorKind::NotFound => {}
                                     Err(e) => {
                                         log_error!(&*loggers, describe_error(&e));
                                     }

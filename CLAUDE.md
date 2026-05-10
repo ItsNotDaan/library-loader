@@ -171,3 +171,6 @@ Defined in `assets/app.css`. Notable ones:
   `UiEvent` channel — never touch GTK widgets from a non-main thread.
 - The KiCad extractor returns an empty `Files::new()` map — it writes files directly
   to disk rather than going through the normal `Result::save()` path.
+- The extractor reads the existing `.kicad_sym` content before appending, and skips
+  any symbol whose name already appears in the file. This prevents duplicates which
+  would cause KiCad to silently refuse to load the library.

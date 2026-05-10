@@ -46,8 +46,11 @@ pub fn extract(
                 Some("kicad_mod") => {
                     let mut f_data = Vec::<u8>::new();
                     item.read_to_end(&mut f_data)?;
+                    // Rewrite bare 3D model paths so KiCad can resolve them.
+                    let raw = String::from_utf8_lossy(&f_data);
+                    let fixed = rewrite_model_paths(&raw, &format.name);
                     let mut f = File::create(footprint_folder.join(base_name))?;
-                    f.write_all(&f_data)?;
+                    f.write_all(fixed.as_bytes())?;
                 }
                 // 3D model → .3dshapes/ (flat, no subfolder)
                 Some("stl") | Some("stp") | Some("wrl") | Some("step") => {
@@ -67,6 +70,9 @@ pub fn extract(
         }
     }
 
+    // Read existing content once so we can skip symbols already present.
+    let existing_content = fs::read_to_string(&fn_lib).unwrap_or_default();
+
     let mut f = File::options().read(true).write(true).open(&fn_lib)?;
     f.seek(SeekFrom::End(-2))?;
 
@@ -78,7 +84,23 @@ pub fn extract(
             .lines()
             .map(|l| l.expect("Could not parse line"))
             .collect();
-        let end = &lines.len() - 1;
+        if lines.len() < 2 {
+            continue;
+        }
+        let end = lines.len() - 1;
+
+        // Extract symbol name from the first content line: (symbol "NAME" ...)
+        // Skip this symbol if it is already in the library.
+        let sym_name: Option<&str> = lines[1]
+            .trim()
+            .strip_prefix("(symbol \"")
+            .and_then(|s| s.find('"').map(|i| &s[..i]));
+        if let Some(name) = sym_name {
+            if existing_content.contains(&format!("(symbol \"{}\"", name)) {
+                continue;
+            }
+        }
+
         for i in 0..end {
             //this is necessary to point symbols to correct footprint library
             let parts = lines[i].split_whitespace().collect::<Vec<_>>();
@@ -98,4 +120,64 @@ pub fn extract(
     f.write_all(")\n".as_bytes())?;
 
     Ok(Files::new())
+}
+
+/// Rewrite bare 3D model paths in a `.kicad_mod` file so that KiCad can
+/// resolve them using the `${KICAD_LOCAL_LIB_DIR}` path variable.
+///
+/// Handles both quoted and unquoted CSE formats:
+///   `(model "foo.stp"`   →  `(model "${KICAD_LOCAL_LIB_DIR}/Lib/Lib.3dshapes/foo.stp"`
+///   `(model foo.stp`     →  `(model "${KICAD_LOCAL_LIB_DIR}/Lib/Lib.3dshapes/foo.stp"`
+///
+/// Paths that already contain a `/`, `\`, or `$` variable are left unchanged.
+fn rewrite_model_paths(content: &str, lib_name: &str) -> String {
+    let mut out = String::with_capacity(content.len() + 64);
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if let Some(after_model) = trimmed.strip_prefix("(model ") {
+            let indent = &line[..line.len() - trimmed.len()];
+
+            // Quoted path: (model "foo.stp"  or  (model "foo.stp"   <rest>
+            if let Some(inner) = after_model.strip_prefix('"') {
+                if let Some(quote_end) = inner.find('"') {
+                    let path = &inner[..quote_end];
+                    let rest = &inner[quote_end..]; // starts with closing "
+                    if is_bare_path(path) {
+                        out.push_str(&format!(
+                            "{}(model \"${{KICAD_LOCAL_LIB_DIR}}/{}/{}.3dshapes/{}",
+                            indent, lib_name, lib_name, path
+                        ));
+                        out.push_str(rest);
+                        out.push('\n');
+                        continue;
+                    }
+                }
+            } else {
+                // Unquoted path: (model foo.stp   — token ends at whitespace or end-of-line
+                let path_end = after_model
+                    .find(|c: char| c.is_whitespace())
+                    .unwrap_or(after_model.len());
+                let path = &after_model[..path_end];
+                let rest = &after_model[path_end..]; // trailing whitespace / empty
+                if is_bare_path(path) {
+                    out.push_str(&format!(
+                        "{}(model \"${{KICAD_LOCAL_LIB_DIR}}/{}/{}.3dshapes/{}\"",
+                        indent, lib_name, lib_name, path
+                    ));
+                    out.push_str(rest);
+                    out.push('\n');
+                    continue;
+                }
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Returns true for a bare filename — no directory separator and no `$` variable.
+#[inline]
+fn is_bare_path(path: &str) -> bool {
+    !path.is_empty() && !path.contains('/') && !path.contains('\\') && !path.starts_with('$')
 }
